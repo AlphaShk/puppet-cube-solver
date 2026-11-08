@@ -323,11 +323,3 @@ def compiled_catalog() -> tuple[CompiledAlgorithm, ...]:
         if algorithm_effect(item.simulation_tokens) != item.effect:  # pragma: no cover
             raise RuntimeError(f"Catalog verification failed for {item.definition.name}")
     return result
-
-
-if __name__ == "__main__":
-    for entry in compiled_catalog():
-        print(
-            f"{entry.definition.name}: {entry.face_turn_count} turns; "
-            f"permutation={entry.effect.permutation}; orientation={entry.effect.orientation}"
-        )

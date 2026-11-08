@@ -14,16 +14,9 @@ from tkinter import messagebox, scrolledtext, ttk
 from typing import cast
 
 from .algorithms import CompiledAlgorithm, compiled_catalog
-from .cube import EdgeState, flipped_edges, moved_edges
-from .instructions import execution_steps, grip_description
+from .report import format_report
 from .settings import EDGES, edge_colors, edge_label
-from .solver import (
-    Request,
-    RequestError,
-    SearchLimitReached,
-    no_match_message,
-    validate_request,
-)
+from .solver import Request, RequestError, SearchLimitReached, validate_request
 from .worker import SearchOutcome, SearchWorker
 
 
@@ -543,140 +536,14 @@ class EdgePickerApp(ttk.Frame):
     def _render_last_results(self) -> None:
         if self._last_request is None:
             return
-        request = self._last_request
-        results = self._last_results
-        lines = ["Requested edge effect:"]
-        for first, second in request.swaps:
-            lines.append(
-                f"  {edge_label(first, self.label_mode)} \N{LEFT RIGHT ARROW} "
-                f"{edge_label(second, self.label_mode)}"
-            )
-        for first, second, third in request.cycles:
-            labels = tuple(
-                edge_label(edge, self.label_mode) for edge in (first, second, third)
-            )
-            lines.append(
-                f"  {labels[0]} \N{RIGHTWARDS ARROW} {labels[1]} "
-                f"\N{RIGHTWARDS ARROW} {labels[2]} \N{RIGHTWARDS ARROW} {labels[0]}"
-            )
-        if request.flips:
-            ordered_flips = sorted(request.flips, key=EDGES.index)
-            lines.append(
-                "  Flip in place: "
-                + " and ".join(
-                    edge_label(edge, self.label_mode) for edge in ordered_flips
-                )
-            )
-        protected = sorted(request.preserved, key=EDGES.index)
-        protected_description = (
-            "All other edges (required by flip mode)"
-            if request.flips
-            else (
-                ", ".join(edge_label(edge, self.label_mode) for edge in protected)
-                if protected
-                else "None"
+        self._set_result(
+            format_report(
+                self._last_request,
+                self._last_results,
+                label_mode=self.label_mode,
+                show_alternatives=self.show_alternatives_var.get(),
             )
         )
-        lines.extend(
-            (
-                "",
-                "Protected edge slots:",
-                "  " + protected_description,
-                "",
-            )
-        )
-        if not results:
-            lines.append(no_match_message(request))
-            self._set_result("\n".join(lines))
-            return
-
-        shown = results if self.show_alternatives_var.get() else results[:1]
-        for index, result in enumerate(shown):
-            heading = "Best match" if index == 0 else f"Alternative {index}"
-            effect = result.effect
-            steps = execution_steps(result.tokens)
-            starting_position = grip_description(result.definition.starting_rotation)
-            grip_names = [starting_position] + [step.grip_name for step in steps]
-            grip_changes = sum(
-                first != second for first, second in zip(grip_names, grip_names[1:])
-            )
-            display_name = result.definition.name
-            macro_label = (
-                "Macro path"
-                if result.definition.source_section == "Verified macro search"
-                else "Guide macros"
-            )
-            lines.extend(
-                (
-                    f"{heading}:",
-                    f"  {display_name}",
-                    f"  {macro_label}: {result.definition.macro_notation or 'expanded case'}",
-                    "",
-                    "Starting position:",
-                    f"  {starting_position}",
-                    "",
-                )
-            )
-            if len(steps) == 1 and steps[0].grip_name == starting_position:
-                lines.extend(
-                    (
-                        "Algorithm:",
-                        f"  {' '.join(steps[0].moves)}",
-                    )
-                )
-            else:
-                lines.append("Execution steps:")
-                for step_number, step in enumerate(steps, 1):
-                    lines.extend(
-                        (
-                            f"  Step {step_number} — hold {step.grip_name}:",
-                            f"    {' '.join(step.moves)}",
-                        )
-                    )
-            lines.extend(
-                (
-                    "",
-                    "Actual edge permutation:",
-                    "  " + self._permutation_summary(effect),
-                    "Moved edge slots:",
-                    "  " + self._edge_list(moved_edges(effect)),
-                    "Flipped edge slots:",
-                    "  " + self._edge_list(flipped_edges(effect)),
-                    f"Face-turn count: {result.face_turn_count}",
-                    f"Grip changes: {grip_changes}",
-                )
-            )
-            if index != len(shown) - 1:
-                lines.extend(("", "" + "\N{BOX DRAWINGS LIGHT HORIZONTAL}" * 60, ""))
-        self._set_result("\n".join(lines))
-
-    def _edge_list(self, edges: tuple[str, ...]) -> str:
-        if not edges:
-            return "None"
-        return ", ".join(edge_label(edge, self.label_mode) for edge in edges)
-
-    def _permutation_summary(self, effect: EdgeState) -> str:
-        source_to_destination = {
-            source: destination
-            for destination, source in enumerate(effect.permutation)
-        }
-        seen: set[int] = set()
-        cycles: list[str] = []
-        for start in range(len(EDGES)):
-            if start in seen or source_to_destination[start] == start:
-                continue
-            cycle: list[int] = []
-            current = start
-            while current not in seen:
-                seen.add(current)
-                cycle.append(current)
-                current = source_to_destination[current]
-            labels = [edge_label(EDGES[index], self.label_mode) for index in cycle]
-            if len(labels) == 2:
-                cycles.append(f"{labels[0]} ↔ {labels[1]}")
-            else:
-                cycles.append(" → ".join(labels + labels[:1]))
-        return "; ".join(cycles) if cycles else "None"
 
     def _set_result(self, text: str) -> None:
         self.result_text.configure(state="normal")
