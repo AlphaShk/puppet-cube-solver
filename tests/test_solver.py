@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
 from puppet_edge_picker.algorithms import catalog_rank, compiled_catalog
 from puppet_edge_picker.cube import algorithm_effect
@@ -12,7 +13,10 @@ from puppet_edge_picker.solver import (
     apply_effect,
     find_algorithms,
     matches,
+    movable_edges,
     no_match_message,
+    search_exact_flip_combinations,
+    search_macro_combinations,
     validate_request,
 )
 
@@ -201,6 +205,50 @@ class SolverTests(unittest.TestCase):
         self.assertTrue(results)
         for result in results:
             self.assertTrue(matches(result.effect, request))
+
+
+class FixedEdgeTests(unittest.TestCase):
+    """DR, DB and BR are never changed by any verified case or macro."""
+
+    def test_phase_three_cases_change_only_nine_edges(self) -> None:
+        self.assertEqual(movable_edges(), frozenset(EDGES) - {"DR", "DB", "BR"})
+
+    def test_requests_on_fixed_edges_return_without_searching(self) -> None:
+        for request in (
+            Request((("UF", "DR"),)),
+            Request(cycles=(("UF", "BR", "FL"),)),
+            Request(flips=frozenset({"BR", "FL"})),
+        ):
+            with self.subTest(request=request), mock.patch(
+                "puppet_edge_picker.solver.search_macro_combinations"
+            ) as breadth_first, mock.patch(
+                "puppet_edge_picker.solver.search_exact_flip_combinations"
+            ) as bidirectional:
+                self.assertEqual(find_algorithms(request), ())
+                breadth_first.assert_not_called()
+                bidirectional.assert_not_called()
+
+    def test_skipping_the_search_does_not_change_the_answer(self) -> None:
+        self.assertEqual(search_macro_combinations(Request((("UF", "DR"),))), ())
+        self.assertEqual(
+            search_exact_flip_combinations(Request(flips=frozenset({"UF", "BR"}))), ()
+        )
+
+    def test_no_match_message_names_the_fixed_edge(self) -> None:
+        message = no_match_message(Request((("UF", "DR"),)))
+        self.assertIn("Yellow\N{EN DASH}Red (DR) edge", message)
+        self.assertNotIn("search limits", message)
+        message = no_match_message(Request(flips=frozenset({"DR", "BR"})))
+        self.assertIn("(DR) and Blue\N{EN DASH}Red (BR) edges", message)
+
+    def test_depth_limited_requests_keep_the_search_limit_message(self) -> None:
+        request = Request(
+            (("UF", "UR"), ("UB", "UL")),
+            frozenset(set(EDGES) - {"UF", "UR", "UB", "UL"}),
+            True,
+        )
+        self.assertEqual(find_algorithms(request), ())
+        self.assertIn("search limits", no_match_message(request))
 
 
 if __name__ == "__main__":

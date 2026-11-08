@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from .algorithms import Algorithm, CompiledAlgorithm, catalog_rank, compiled_catalog
-from .cube import EdgeState, SOLVED, algorithm_effect
+from .cube import EdgeState, SOLVED, algorithm_effect, flipped_edges, moved_edges
 from .notation import face_turn_count, format_algorithm, rotation_count
-from .settings import EDGES, EDGE_INDEX
+from .settings import EDGES, EDGE_INDEX, edge_label
 
 # Polled between search states; returning True stops the search.
 CancelCheck = Callable[[], bool]
@@ -49,6 +49,28 @@ def requested_edges(request: Request) -> frozenset[str]:
         for group in (*request.swaps, *request.cycles, tuple(request.flips))
         for edge in group
     )
+
+
+@lru_cache(maxsize=1)
+def movable_edges() -> frozenset[str]:
+    """Return the slots that at least one verified catalogue entry changes.
+
+    The search generators are catalogue entries and every search result is
+    a product of them, so no result can move or flip any other slot.
+    """
+
+    touched: set[str] = set()
+    for entry in compiled_catalog():
+        touched.update(moved_edges(entry.effect))
+        touched.update(flipped_edges(entry.effect))
+    return frozenset(touched)
+
+
+def fixed_requested_edges(request: Request) -> tuple[str, ...]:
+    """Return requested slots that no verified case or macro moves or flips."""
+
+    requested = requested_edges(request)
+    return tuple(edge for edge in EDGES if edge in requested and edge not in movable_edges())
 
 
 def validate_request(request: Request) -> None:
@@ -406,6 +428,10 @@ def find_algorithms(
     validate_request(request)
     if limit < 1:
         raise ValueError("Result limit must be positive")
+    if fixed_requested_edges(request):
+        # Neither a catalogue entry nor any product of the search generators
+        # changes these slots, so the answer is empty without searching.
+        return ()
 
     matches_found: list[CompiledAlgorithm] = []
     for candidate in compiled_catalog():
@@ -435,6 +461,20 @@ def no_match_message(request: Request | None = None) -> str:
             "edge in the guide's fixed Puppet Cube grips. That edge is the "
             "anchor preserved by every published case; check the phase setup "
             "or choose a request that leaves it fixed."
+        )
+    fixed = fixed_requested_edges(request) if request is not None else ()
+    if fixed:
+        names = " and ".join(f"{edge_label(edge)} ({edge})" for edge in fixed)
+        if len(fixed) == 1:
+            noun, pronoun, verb, object_pronoun = "edge", "it", "stays", "it"
+        else:
+            noun, pronoun, verb, object_pronoun = "edges", "they", "stay", "them"
+        return (
+            f"No verified phase-3 case or macro moves or flips the {names} "
+            f"{noun}, so no combination of them can produce this effect. Like "
+            f"the Blue\N{EN DASH}Yellow (DB) anchor, {pronoun} {verb} in place "
+            f"in every published case; choose a request that leaves "
+            f"{object_pronoun} fixed."
         )
     if request is not None and request.flips:
         return (
