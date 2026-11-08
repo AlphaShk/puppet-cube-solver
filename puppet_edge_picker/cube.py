@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from .notation import move_amount, parse_algorithm
-from .settings import EDGES, EDGE_INDEX
+from .settings import EDGE_INDEX, EDGES
 
 Vector = tuple[int, int, int]
 
@@ -148,7 +148,6 @@ def _apply_face_quarter(state: EdgeState, face: str, *, wide: bool = False) -> E
         new_index = EDGE_INDEX[new_position]
 
         piece_index = state.permutation[old_index]
-        piece = EDGES[piece_index]
         old_orientation = state.orientation[old_index]
         first_sticker_location = old_position[old_orientation]
         new_first_location = position_map[first_sticker_location]

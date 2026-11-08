@@ -4,7 +4,11 @@ import unittest
 
 from puppet_edge_picker.algorithms import compiled_catalog, guide_algorithms
 from puppet_edge_picker.cube import cube_orientation_sequences, rotation_face_mapping
-from puppet_edge_picker.instructions import execution_steps, grip_description, grip_faces
+from puppet_edge_picker.instructions import (
+    execution_steps,
+    grip_description,
+    grip_faces,
+)
 from puppet_edge_picker.notation import face_turn_count, parse_algorithm
 
 

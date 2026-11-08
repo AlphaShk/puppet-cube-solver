@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install the package
+        run: python -m pip install .
+      - name: Run unit tests
+        # The window tests skip themselves because the runner has no display.
+        run: python -m unittest -v
+      - name: Smoke-test the installed package
+        working-directory: ${{ runner.temp }}
+        run: |
+          python -m puppet_edge_picker.cli swap UF UR
+          python -m puppet_edge_picker.cli flip UB FR --labels faces
+          command -v puppet-edge-picker
+
+  lint:
+    name: Lint and type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pinned tools
+        run: python -m pip install -r requirements-dev.txt
+      - name: Ruff
+        run: ruff check .
+      - name: Mypy
+        run: mypy

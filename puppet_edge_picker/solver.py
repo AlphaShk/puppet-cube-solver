@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from .algorithms import Algorithm, CompiledAlgorithm, catalog_rank, compiled_catalog
-from .cube import EdgeState, SOLVED, algorithm_effect, flipped_edges, moved_edges
+from .cube import SOLVED, EdgeState, algorithm_effect, flipped_edges, moved_edges
 from .notation import face_turn_count, format_algorithm, rotation_count
-from .settings import EDGES, EDGE_INDEX, edge_label
+from .settings import EDGE_INDEX, EDGES, edge_label
 
 # Polled between search states; returning True stops the search.
 CancelCheck = Callable[[], bool]

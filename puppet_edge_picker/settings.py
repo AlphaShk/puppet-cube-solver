@@ -64,8 +64,10 @@ def edge_color_codes(edge: str) -> tuple[str, str]:
 
     if edge not in EDGE_INDEX:
         raise ValueError(f"Unknown edge slot: {edge}")
-    colors = (FACE_COLORS[edge[0]], FACE_COLORS[edge[1]])
-    return tuple(sorted(colors, key=COLOR_LABEL_ORDER.__getitem__))
+    first, second = sorted(
+        (FACE_COLORS[edge[0]], FACE_COLORS[edge[1]]), key=COLOR_LABEL_ORDER.__getitem__
+    )
+    return first, second
 
 
 def edge_label(edge: str, mode: str = "colors") -> str:

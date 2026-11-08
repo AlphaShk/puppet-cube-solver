@@ -38,3 +38,13 @@ packages = ["puppet_edge_picker"]
 
 [tool.setuptools.dynamic]
 version = { attr = "puppet_edge_picker.__version__" }
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["puppet_edge_picker", "tests", "scripts"]
+# typeshed leaves ttk's state()/instate() unannotated.
+untyped_calls_exclude = ["tkinter.ttk"]

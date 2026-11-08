@@ -1,0 +1,7 @@
+# Pinned tools for the CI lint job; the package itself has no dependencies.
+# Resolved with: uv pip compile (Python 3.12, Linux)
+mypy==1.18.2
+mypy-extensions==1.2.0
+pathspec==1.1.1
+ruff==0.14.3
+typing-extensions==4.16.0

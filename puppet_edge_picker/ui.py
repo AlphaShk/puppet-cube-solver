@@ -163,13 +163,13 @@ class EdgePickerApp(ttk.Frame):
             variable=self.orientation_var,
         ).grid(row=5, column=0, columnspan=6, sticky="w", pady=(10, 0))
 
-    def _effect_frame(self, panel: ttk.Frame, mode: str) -> ttk.Frame:
+    def _effect_frame(self, panel: ttk.LabelFrame, mode: str) -> ttk.Frame:
         frame = ttk.Frame(panel)
         frame.grid(row=1, column=0, columnspan=6, sticky="ew")
         self.effect_frames[mode] = frame
         return frame
 
-    def _build_swap_effect(self, panel: ttk.Frame) -> None:
+    def _build_swap_effect(self, panel: ttk.LabelFrame) -> None:
         frame = self._effect_frame(panel, "swaps")
         frame.columnconfigure(1, weight=1)
         frame.columnconfigure(4, weight=1)
@@ -189,7 +189,7 @@ class EdgePickerApp(ttk.Frame):
         self.effect_choices["swaps"] = choices
         self.choices.extend(choices)
 
-    def _build_cycle_effect(self, panel: ttk.Frame) -> None:
+    def _build_cycle_effect(self, panel: ttk.LabelFrame) -> None:
         frame = self._effect_frame(panel, "cycle")
         for column in (1, 4, 7):
             frame.columnconfigure(column, weight=1)
@@ -210,7 +210,7 @@ class EdgePickerApp(ttk.Frame):
         self.effect_choices["cycle"] = choices
         self.choices.extend(choices)
 
-    def _build_flip_effect(self, panel: ttk.Frame) -> None:
+    def _build_flip_effect(self, panel: ttk.LabelFrame) -> None:
         frame = self._effect_frame(panel, "flips")
         frame.columnconfigure(1, weight=1)
         frame.columnconfigure(4, weight=1)
