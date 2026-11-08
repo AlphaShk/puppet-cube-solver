@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -10,6 +11,9 @@ from .cube import EdgeState, SOLVED, algorithm_effect
 from .notation import face_turn_count, format_algorithm, rotation_count
 from .settings import EDGES, EDGE_INDEX
 
+# Polled between search states; returning True stops the search.
+CancelCheck = Callable[[], bool]
+
 
 class RequestError(ValueError):
     """Raised when a request is conflicting or provably unreachable."""
@@ -17,6 +21,15 @@ class RequestError(ValueError):
 
 class SearchLimitReached(RuntimeError):
     """Raised when bounded macro search cannot complete its current depth."""
+
+
+class SearchCancelled(RuntimeError):
+    """Raised when the caller cancels a search before it finishes."""
+
+
+def _raise_if_cancelled(should_cancel: CancelCheck | None) -> None:
+    if should_cancel is not None and should_cancel():
+        raise SearchCancelled("The search was cancelled.")
 
 
 @dataclass(frozen=True)
@@ -229,8 +242,13 @@ def search_macro_combinations(
     *,
     max_depth: int = 4,
     max_states: int = 250_000,
+    should_cancel: CancelCheck | None = None,
 ) -> tuple[CompiledAlgorithm, ...]:
-    """Breadth-first search combinations of exact-grip guide macros."""
+    """Breadth-first search combinations of exact-grip guide macros.
+
+    ``should_cancel`` is polled once per expanded state; when it returns
+    True the search stops with :class:`SearchCancelled`.
+    """
 
     validate_request(request)
     if max_depth < 1 or max_states < 2:
@@ -244,6 +262,7 @@ def search_macro_combinations(
     for _depth in range(1, max_depth + 1):
         next_frontier: list[tuple[EdgeState, tuple[int, ...]]] = []
         for state, path in frontier:
+            _raise_if_cancelled(should_cancel)
             for generator_index, generator in enumerate(generators):
                 next_state = apply_effect(state, generator.effect)
                 if next_state in visited:
@@ -282,13 +301,15 @@ def search_exact_flip_combinations(
     *,
     max_depth: int = 8,
     max_states: int = 250_000,
+    should_cancel: CancelCheck | None = None,
 ) -> tuple[CompiledAlgorithm, ...]:
     """Bidirectionally search for an exact two-edge flip transformation.
 
     Flip requests identify a complete target state, unlike partial swap
     constraints.  Searching simultaneously from solved and from that target
     reaches depth-six constructions without materializing the millions of
-    states required by one-way breadth-first search.
+    states required by one-way breadth-first search.  ``should_cancel`` is
+    polled once per expanded state, as in :func:`search_macro_combinations`.
     """
 
     validate_request(request)
@@ -317,6 +338,7 @@ def search_exact_flip_combinations(
     ) -> list[EdgeState]:
         next_frontier: list[EdgeState] = []
         for state in frontier:
+            _raise_if_cancelled(should_cancel)
             path = seen[state]
             for generator_index, generator in enumerate(generators):
                 next_state = apply_effect(state, generator.effect)
@@ -373,8 +395,13 @@ def find_algorithms(
     limit: int = 6,
     *,
     search_macros: bool = True,
+    should_cancel: CancelCheck | None = None,
 ) -> tuple[CompiledAlgorithm, ...]:
-    """Return catalog matches, then bounded synthesized matches as fallback."""
+    """Return catalog matches, then bounded synthesized matches as fallback.
+
+    The catalogue check takes milliseconds and always completes;
+    ``should_cancel`` applies to the fallback search.
+    """
 
     validate_request(request)
     if limit < 1:
@@ -393,9 +420,12 @@ def find_algorithms(
     ranked = tuple(sorted(matches_found, key=catalog_rank)[:limit])
     if ranked or not search_macros:
         return ranked
+    _raise_if_cancelled(should_cancel)
     if request.flips:
-        return search_exact_flip_combinations(request, limit)
-    return search_macro_combinations(request, limit)
+        return search_exact_flip_combinations(
+            request, limit, should_cancel=should_cancel
+        )
+    return search_macro_combinations(request, limit, should_cancel=should_cancel)
 
 
 def no_match_message(request: Request | None = None) -> str:

@@ -16,7 +16,7 @@ def main() -> None:
     root.columnconfigure(0, weight=1)
     root.rowconfigure(0, weight=1)
     try:
-        EdgePickerApp(root)
+        app = EdgePickerApp(root)
     except Exception as exc:
         root.withdraw()
         messagebox.showerror(
@@ -27,6 +27,9 @@ def main() -> None:
         root.destroy()
         raise
     root.mainloop()
+    # Closing the window cancels a running search; let its thread finish
+    # before the interpreter releases the Tk objects.
+    app.wait_for_search(timeout=5.0)
 
 
 if __name__ == "__main__":

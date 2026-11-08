@@ -1,7 +1,13 @@
-"""Tkinter interface for the phase-3 edge algorithm picker."""
+"""Tkinter interface for the phase-3 edge algorithm picker.
+
+Searches run on a :class:`~puppet_edge_picker.worker.SearchWorker` thread.
+The window polls for the outcome with ``after`` and never blocks on the
+search, so it stays responsive and the search can be cancelled.
+"""
 
 from __future__ import annotations
 
+import time
 import tkinter as tk
 from dataclasses import dataclass
 from tkinter import messagebox, scrolledtext, ttk
@@ -15,9 +21,10 @@ from .solver import (
     Request,
     RequestError,
     SearchLimitReached,
-    find_algorithms,
     no_match_message,
+    validate_request,
 )
+from .worker import SearchOutcome, SearchWorker
 
 
 @dataclass
@@ -36,8 +43,9 @@ class EdgePickerApp(ttk.Frame):
         "Cycle three edges": "cycle",
         "Flip two edges": "flips",
     }
+    POLL_INTERVAL_MS = 50
 
-    def __init__(self, master: tk.Misc) -> None:
+    def __init__(self, master: tk.Misc, *, worker: SearchWorker | None = None) -> None:
         super().__init__(master, padding=16)
         self.grid(sticky="nsew")
         self.columnconfigure(0, weight=1)
@@ -47,6 +55,11 @@ class EdgePickerApp(ttk.Frame):
         self._effect_mode = "swaps"
         self._last_request: Request | None = None
         self._last_results: tuple[CompiledAlgorithm, ...] = ()
+        self._worker = worker if worker is not None else SearchWorker()
+        self._active_job: int | None = None
+        self._cancelling = False
+        self._search_started = 0.0
+        self._poll_id: str | None = None
         self.choices: list[EdgeChoice] = []
         self.effect_choices: dict[str, list[EdgeChoice]] = {}
         self.effect_frames: dict[str, ttk.Frame] = {}
@@ -72,6 +85,12 @@ class EdgePickerApp(ttk.Frame):
     @property
     def label_mode(self) -> str:
         return self._mode
+
+    @property
+    def busy(self) -> bool:
+        """True from Find until the search has ended and its outcome is shown."""
+
+        return self._poll_id is not None or self._worker.running
 
     def _build_header(self) -> None:
         header = ttk.Frame(self)
@@ -234,17 +253,24 @@ class EdgePickerApp(ttk.Frame):
     def _build_actions(self) -> None:
         actions = ttk.Frame(self)
         actions.grid(row=2, column=0, sticky="ew", pady=12)
-        ttk.Button(actions, text="Find algorithm", command=self.find).grid(
-            row=0, column=0, padx=(0, 8)
-        )
-        ttk.Button(actions, text="Reset", command=self.reset).grid(row=0, column=1)
+        actions.columnconfigure(4, weight=1)
+        self.find_button = ttk.Button(actions, text="Find algorithm", command=self.find)
+        self.find_button.grid(row=0, column=0, padx=(0, 8))
+        self.cancel_button = ttk.Button(actions, text="Cancel", command=self.cancel)
+        self.cancel_button.grid(row=0, column=1, padx=(0, 8))
+        self.cancel_button.state(["disabled"])
+        ttk.Button(actions, text="Reset", command=self.reset).grid(row=0, column=2)
         self.show_alternatives_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(
             actions,
             text="Show alternatives",
             variable=self.show_alternatives_var,
             command=self._render_last_results,
-        ).grid(row=0, column=2, padx=(18, 0))
+        ).grid(row=0, column=3, padx=(18, 0))
+        self.status_var = tk.StringVar(value="")
+        ttk.Label(actions, textvariable=self.status_var).grid(
+            row=0, column=4, sticky="e", padx=(18, 0)
+        )
 
     def _build_results(self) -> None:
         panel = ttk.LabelFrame(self, text="Result", padding=8)
@@ -391,27 +417,128 @@ class EdgePickerApp(ttk.Frame):
         )
 
     def find(self) -> None:
+        """Validate the request here, then search on the worker thread."""
+
+        if self.busy:
+            return
         try:
             request = self._request()
-            results = find_algorithms(request)
+            validate_request(request)
         except RequestError as exc:
-            self._last_request = None
-            self._last_results = ()
-            self._set_result(f"Invalid or unreachable request\n\n{exc}")
-            messagebox.showwarning("Cannot search", str(exc), parent=self.winfo_toplevel())
+            self._show_request_error(exc)
             return
-        except SearchLimitReached as exc:
-            self._last_request = request
+        self._last_request = None
+        self._last_results = ()
+        self._active_job = self._worker.start(request)
+        self._search_started = time.perf_counter()
+        self._set_busy(True)
+        self._set_result(
+            "Searching the verified catalogue, then combinations of guide macros..."
+        )
+        self._schedule_poll()
+
+    def cancel(self) -> None:
+        """Ask the running search to stop; the window stays usable meanwhile."""
+
+        if not self._worker.running or self._cancelling:
+            return
+        self._worker.cancel()
+        self._cancelling = True
+        self.cancel_button.state(["disabled"])
+        self.status_var.set("Cancelling...")
+
+    def _schedule_poll(self) -> None:
+        self._poll_id = self.after(self.POLL_INTERVAL_MS, self._poll_search)
+
+    def _poll_search(self) -> None:
+        self._poll_id = None
+        # Read the state before taking the outcome: a search that finishes
+        # between the two calls is then handled now instead of being missed.
+        still_running = self._worker.running
+        outcome = self._worker.poll()
+        if outcome is None and still_running:
+            if not self._cancelling:
+                elapsed = time.perf_counter() - self._search_started
+                self.status_var.set(f"Searching... {elapsed:.1f} s")
+            self._schedule_poll()
+            return
+        self._set_busy(False)
+        if outcome is None or outcome.job != self._active_job:
+            return  # Reset discarded this search while it was running.
+        self._active_job = None
+        self._show_outcome(outcome)
+
+    def _set_busy(self, busy: bool) -> None:
+        self._cancelling = False
+        self.find_button.state(["disabled"] if busy else ["!disabled"])
+        self.cancel_button.state(["!disabled"] if busy else ["disabled"])
+        self.status_var.set("Searching..." if busy else "")
+
+    def _show_outcome(self, outcome: SearchOutcome) -> None:
+        error = outcome.error
+        if outcome.cancelled:
+            self.status_var.set("Search cancelled.")
+            self._set_result(
+                "Search cancelled\n\nNo algorithm was selected. "
+                "Select Find algorithm to search again."
+            )
+            return
+        if isinstance(error, RequestError):
+            self._show_request_error(error)
+            return
+        if isinstance(error, SearchLimitReached):
+            self._last_request = outcome.request
             self._last_results = ()
+            self.status_var.set("Search limit reached.")
             self._set_result(
                 "Search limit reached\n\n"
-                f"{exc}\n\nTry unprotecting another edge or selecting a second swap pair."
+                f"{error}\n\nTry unprotecting another edge or selecting a second swap pair."
             )
-            messagebox.showinfo("Search limit reached", str(exc), parent=self.winfo_toplevel())
+            messagebox.showinfo(
+                "Search limit reached", str(error), parent=self.winfo_toplevel()
+            )
             return
-        self._last_request = request
-        self._last_results = results
+        if error is not None:
+            self.status_var.set("Search failed.")
+            self._set_result(f"Search failed\n\n{error}")
+            messagebox.showerror("Search failed", str(error), parent=self.winfo_toplevel())
+            return
+        self._last_request = outcome.request
+        self._last_results = outcome.results
+        count = len(outcome.results)
+        plural = "" if count == 1 else "s"
+        self.status_var.set(
+            f"{count} result{plural} in {outcome.elapsed:.2f} s"
+            if count
+            else f"No match ({outcome.elapsed:.2f} s)"
+        )
         self._render_last_results()
+
+    def _show_request_error(self, exc: RequestError) -> None:
+        self._last_request = None
+        self._last_results = ()
+        self.status_var.set("")
+        self._set_result(f"Invalid or unreachable request\n\n{exc}")
+        messagebox.showwarning("Cannot search", str(exc), parent=self.winfo_toplevel())
+
+    def wait_for_search(self, timeout: float | None = None) -> bool:
+        """Cancel any running search and wait for its thread to finish.
+
+        Call this after the event loop ends so that no search thread is still
+        running while Tk objects are released.
+        """
+
+        self._worker.cancel()
+        return self._worker.wait(timeout)
+
+    def destroy(self) -> None:
+        """Stop any running search and pending poll before the window closes."""
+
+        self._worker.cancel()
+        if self._poll_id is not None:
+            self.after_cancel(self._poll_id)
+            self._poll_id = None
+        super().destroy()
 
     def _render_last_results(self) -> None:
         if self._last_request is None:
@@ -558,6 +685,13 @@ class EdgePickerApp(ttk.Frame):
         self.result_text.configure(state="disabled")
 
     def reset(self) -> None:
+        if self.busy:
+            # Discard the running search; polling continues until it stops.
+            self._worker.cancel()
+            self._cancelling = True
+            self._active_job = None
+            self.cancel_button.state(["disabled"])
+        self.status_var.set("")
         self.mode_var.set("Colors")
         self._mode = "colors"
         self.effect_mode_var.set("Swap one/two pairs")
