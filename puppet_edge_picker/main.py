@@ -3,9 +3,20 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 
 from .ui import EdgePickerApp
+
+
+def use_readable_theme(root: tk.Misc) -> None:
+    """Replace Tk's plain X11 ``default`` theme with ``clam``.
+
+    The native themes on macOS (``aqua``) and Windows (``vista``) are kept.
+    """
+
+    style = ttk.Style(root)
+    if style.theme_use() == "default" and "clam" in style.theme_names():
+        style.theme_use("clam")
 
 
 def main() -> None:
@@ -15,6 +26,7 @@ def main() -> None:
     root.minsize(760, 640)
     root.columnconfigure(0, weight=1)
     root.rowconfigure(0, weight=1)
+    use_readable_theme(root)
     try:
         app = EdgePickerApp(root)
     except Exception as exc:

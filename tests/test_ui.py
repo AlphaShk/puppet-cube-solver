@@ -87,6 +87,7 @@ class UiWindowTests(unittest.TestCase):
     def make_app(self, worker: SearchWorker | None = None) -> EdgePickerApp:
         from puppet_edge_picker.ui import EdgePickerApp
 
+        assert self.root is not None
         app = EdgePickerApp(self.root, worker=worker)
         self.addCleanup(self.destroy_app, app)
         return app
@@ -163,6 +164,21 @@ class UiWindowTests(unittest.TestCase):
         app.find()
         app.destroy()
         self.assertTrue(worker.wait(timeout=10))
+
+    def test_only_the_plain_default_theme_is_replaced(self) -> None:
+        from tkinter import ttk
+
+        from puppet_edge_picker.main import use_readable_theme
+
+        assert self.root is not None
+        style = ttk.Style(self.root)
+        self.addCleanup(style.theme_use, style.theme_use())
+        style.theme_use("default")
+        use_readable_theme(self.root)
+        self.assertEqual(style.theme_use(), "clam")
+        style.theme_use("alt")
+        use_readable_theme(self.root)
+        self.assertEqual(style.theme_use(), "alt")
 
 
 if __name__ == "__main__":
