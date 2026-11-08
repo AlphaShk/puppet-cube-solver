@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "puppet-edge-picker"
 dynamic = ["version"]
-description = "Verified Puppet Cube phase-3 edge algorithm picker with bounded macro search."
+description = "Puppet Cube (V1) phase-3 edge-algorithm picker: guide cases verified in simulation, plus bounded macro search."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -24,6 +24,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Games/Entertainment :: Puzzle Games",
 ]
 
@@ -32,6 +33,7 @@ Repository = "https://github.com/AlphaShk/puppet-cube-solver"
 
 [project.scripts]
 puppet-edge-picker = "puppet_edge_picker.main:main"
+puppet-edge-picker-cli = "puppet_edge_picker.cli:main"
 
 [tool.setuptools]
 packages = ["puppet_edge_picker"]

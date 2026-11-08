@@ -1,12 +1,13 @@
 """Command-line interface: print a verified phase-3 algorithm without Tk.
 
-Examples::
+Installed as ``puppet-edge-picker-cli``; ``python -m puppet_edge_picker.cli``
+runs the same program. Examples::
 
-    python -m puppet_edge_picker.cli swap UF UR
-    python -m puppet_edge_picker.cli swap UB UL DL BL --preserve-rest --ignore-orientation
-    python -m puppet_edge_picker.cli cycle DL FL BL --preserve-rest
-    python -m puppet_edge_picker.cli flip UB FR
-    python -m puppet_edge_picker.cli catalogue
+    puppet-edge-picker-cli swap UF UR
+    puppet-edge-picker-cli swap UB UL DL BL --preserve-rest --ignore-orientation
+    puppet-edge-picker-cli cycle DL FL BL --preserve-rest
+    puppet-edge-picker-cli flip UB FR
+    puppet-edge-picker-cli catalogue
 
 Edges are named by face letters in either order (``UF`` or ``FU``), by colour
 initials (``WG``) or by colour names (``white-green``), using the solved
@@ -21,7 +22,7 @@ import time
 from collections.abc import Sequence
 
 from . import __version__
-from .algorithms import compiled_catalog
+from .algorithms import GUIDE_URL, compiled_catalog
 from .cube import flipped_edges
 from .instructions import grip_description
 from .report import edge_list, format_report, permutation_summary
@@ -122,7 +123,7 @@ def _add_request_options(parser: argparse.ArgumentParser, *, flips: bool) -> Non
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="python -m puppet_edge_picker.cli",
+        prog="puppet-edge-picker-cli",
         description=(
             "Pick a verified Puppet Cube (V1) phase-3 algorithm for an edge "
             "effect and print grip-by-grip instructions."
@@ -206,6 +207,7 @@ def _print_catalogue(label_mode: str) -> int:
         f"{len(catalogue)} verified catalogue entries "
         "(each simulated and de-duplicated by edge effect)"
     )
+    print(f"Source: {GUIDE_URL}")
     for entry in catalogue:
         definition = entry.definition
         print()

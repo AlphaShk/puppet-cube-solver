@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import contextlib
 import gc
+import io
 import os
+import subprocess
 import sys
 import time
 import unittest
 from collections.abc import Callable
+from pathlib import Path
 from typing import TYPE_CHECKING, NoReturn
 from unittest import mock
 
@@ -31,6 +35,44 @@ def run_until_cancelled(
     while not should_cancel():
         time.sleep(0.001)
     raise SearchCancelled("cancelled")
+
+
+class WindowEntryPointTests(unittest.TestCase):
+    """The window command prints a hint, not a traceback, when Tk is missing."""
+
+    def test_missing_tkinter_gives_a_hint_and_exit_status_1(self) -> None:
+        program = (
+            "import sys\n"
+            "sys.modules['tkinter'] = None\n"
+            "sys.modules['_tkinter'] = None\n"
+            "from puppet_edge_picker.main import main\n"
+            "sys.exit(main())\n"
+        )
+        completed = subprocess.run(
+            [sys.executable, "-c", program],
+            cwd=Path(__file__).resolve().parent.parent,
+            env=dict(os.environ, PYTHONIOENCODING="utf-8"),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=120,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("needs tkinter", completed.stderr)
+        self.assertIn("puppet-edge-picker-cli", completed.stderr)
+        self.assertNotIn("Traceback", completed.stderr)
+
+    @unittest.skipUnless(TK_AVAILABLE, "tkinter is not installed")
+    def test_no_display_gives_a_hint_and_exit_status_1(self) -> None:
+        from puppet_edge_picker.main import main
+
+        stderr = io.StringIO()
+        with mock.patch(
+            "tkinter.Tk", side_effect=tkinter.TclError("no display name")
+        ), contextlib.redirect_stderr(stderr):
+            self.assertEqual(main(), 1)
+        self.assertIn("Tk cannot open a window (no display name)", stderr.getvalue())
 
 
 @unittest.skipUnless(TK_AVAILABLE, "tkinter is not installed")
