@@ -134,6 +134,31 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("Best match", completed.stdout)
 
+    def test_runs_without_tkinter(self) -> None:
+        # Mapping a module to None in sys.modules makes importing it fail, so
+        # this run behaves like a Python build that ships without Tk.
+        root = Path(puppet_edge_picker.__file__).resolve().parent.parent
+        env = dict(os.environ, PYTHONIOENCODING="utf-8")
+        program = (
+            "import sys\n"
+            "sys.modules['tkinter'] = None\n"
+            "sys.modules['_tkinter'] = None\n"
+            "from puppet_edge_picker import cli\n"
+            "sys.exit(cli.main(['flip', 'UB', 'FR']))\n"
+        )
+        completed = subprocess.run(
+            [sys.executable, "-c", program],
+            cwd=root,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=120,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("Synthesized 6-macro match", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
