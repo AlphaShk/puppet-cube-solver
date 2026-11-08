@@ -1,7 +1,8 @@
 """Immutable edge-only Rubik/Puppet Cube simulation.
 
-The geometry-based implementation keeps the move tables auditable: a face
-turn rotates edge positions and sticker directions in 3-D. Whole-cube
+There are no hand-typed move tables: each face turn derives its slot and
+orientation mapping from geometry, rotating edge positions and sticker
+directions in 3-D. Whole-cube
 rotations rename positions and pieces together, matching the guide's use of
 rotations as regrips rather than puzzle moves.
 """

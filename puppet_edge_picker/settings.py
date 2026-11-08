@@ -19,7 +19,7 @@ EDGES = (
 
 EDGE_INDEX = {edge: index for index, edge in enumerate(EDGES)}
 
-# Stable solved-color reference used for edge-slot names.  Published guide
+# Stable solved-colour reference used for edge-slot names.  Published guide
 # cases are rotated into their diagram grips in algorithms.py.
 FACE_COLORS = {
     "U": "W",
@@ -30,7 +30,7 @@ FACE_COLORS = {
     "L": "O",
 }
 
-# Keep familiar color-pair names (White–Blue, Blue–Orange, and so on)
+# Keep familiar colour-pair names (White–Blue, Blue–Orange, and so on)
 # independent of the internal face-letter order.
 COLOR_LABEL_ORDER = {color: index for index, color in enumerate("W Y G B R O".split())}
 
@@ -52,15 +52,8 @@ TK_COLORS = {
     "O": "#ff7a00",
 }
 
-MOVE_LEGEND = (
-    "U = White    D = Yellow\n"
-    "F = Green    B = Blue\n"
-    "R = Red      L = Orange"
-)
-
-
 def edge_color_codes(edge: str) -> tuple[str, str]:
-    """Return an edge's colors in stable user-facing label order."""
+    """Return an edge's colours in stable user-facing label order."""
 
     if edge not in EDGE_INDEX:
         raise ValueError(f"Unknown edge slot: {edge}")
@@ -86,7 +79,7 @@ def edge_label(edge: str, mode: str = "colors") -> str:
 
 
 def edge_colors(edge: str) -> tuple[str, str]:
-    """Return the two Tk colors used for an edge label."""
+    """Return the two Tk colours used for an edge label."""
 
     first, second = edge_color_codes(edge)
     return TK_COLORS[first], TK_COLORS[second]

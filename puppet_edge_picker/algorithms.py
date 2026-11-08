@@ -1,4 +1,4 @@
-"""Verified phase-3 guide catalog in mechanically permissible grips."""
+"""Verified phase-3 guide catalogue in mechanically permissible grips."""
 
 from __future__ import annotations
 
@@ -19,11 +19,17 @@ from .notation import (
     rotation_count,
 )
 
+# The published move sequences, macro numbers, section names, case numbers
+# and grips below are transcribed from the Puppet Cube (V1) phase-3 page of
+# the Twisty Puzzle Guide by mrlhumphreys (GUIDE_URL). Credit for them belongs
+# to the guide's author; they are not covered by this repository's MIT licence
+# (see README, Credits). BASE_SIMULATION_TEXT is this package's own model of
+# the base macros, not part of the guide.
 GUIDE_URL = "https://mrlhumphreys.github.io/twisty_guide_j/guides/puppet-cube-phase-3"
 
 # The guide diagrams use two outer-cube grips.  These rotations produce
 # Yellow up / Orange front / Blue right and Yellow up / Green front / Orange
-# right, respectively, from the stable solved-color reference in settings.py.
+# right, respectively, from the stable solved-colour reference in settings.py.
 # The table was audited against every a-1 through e-8 SVG used by the guide.
 GUIDE_GRIP_A: tuple[str, ...] = ("Y", "X2")
 GUIDE_GRIP_B: tuple[str, ...] = ("Z2",)
@@ -54,7 +60,6 @@ class Algorithm:
     macro_count: int = 1
     macro_notation: str = ""
     generated: bool = False
-    rotations: tuple[str, ...] = ()
     starting_rotation: tuple[str, ...] = ()
     simulation_moves: str = ""
 
@@ -154,7 +159,7 @@ def _composed(
 def _apply_starting_rotation(
     definition: Algorithm, starting_rotation: tuple[str, ...]
 ) -> Algorithm:
-    """Conjugate a local guide formula into the guide's reference colors."""
+    """Conjugate a local guide formula into the guide's reference colours."""
 
     visible = _normalize_final_frame(
         starting_rotation + parse_algorithm(definition.moves)
@@ -172,10 +177,10 @@ def _apply_starting_rotation(
 
 
 def _normalize_final_frame(tokens: tuple[str, ...]) -> tuple[str, ...]:
-    """Restore the original color frame after the guide's final regrip.
+    """Restore the original colour frame after the guide's final regrip.
 
     X/Y/Z are physical grip changes, so a guide formula need not undo them at
-    the end.  Edge effects, however, must be compared in the original color
+    the end.  Edge effects, however, must be compared in the original colour
     frame.  Appending a rotation-only restoration does not add puzzle turns
     and is omitted from the displayed execution steps.
     """
@@ -185,7 +190,7 @@ def _normalize_final_frame(tokens: tuple[str, ...]) -> tuple[str, ...]:
     for restoration in cube_orientation_sequences():
         if rotation_face_mapping(rotations + restoration) == identity:
             return tokens + restoration
-    raise RuntimeError("Could not restore the guide algorithm's color frame")
+    raise RuntimeError("Could not restore the guide algorithm's colour frame")
 
 
 def guide_algorithms() -> tuple[Algorithm, ...]:
@@ -287,7 +292,7 @@ def _compile(definition: Algorithm) -> CompiledAlgorithm:
 
 
 def catalog_rank(item: CompiledAlgorithm) -> tuple[int, int, int, int, int, str]:
-    """Stable catalog/result ranking policy."""
+    """Stable catalogue/result ranking policy."""
 
     return (
         item.face_turn_count,
@@ -318,8 +323,8 @@ def compiled_catalog() -> tuple[CompiledAlgorithm, ...]:
 
     result = tuple(sorted(by_effect.values(), key=catalog_rank))
     if not result:  # pragma: no cover - startup integrity guard
-        raise RuntimeError("The phase-3 algorithm catalog is empty")
+        raise RuntimeError("The phase-3 algorithm catalogue is empty")
     for item in result:
         if algorithm_effect(item.simulation_tokens) != item.effect:  # pragma: no cover
-            raise RuntimeError(f"Catalog verification failed for {item.definition.name}")
+            raise RuntimeError(f"Catalogue verification failed for {item.definition.name}")
     return result

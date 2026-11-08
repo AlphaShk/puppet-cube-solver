@@ -19,6 +19,16 @@ from .settings import EDGES, edge_colors, edge_label
 from .solver import Request, RequestError, SearchLimitReached, validate_request
 from .worker import SearchOutcome, SearchWorker
 
+# Initial edge in each request field: the swap pairs, the 3-cycle and the
+# flip pair.  None leaves the optional second swap pair empty.
+DEFAULT_SELECTION: tuple[str | None, ...] = (
+    "UF", "UR", None, None, "DL", "FL", "BL", "DL", "FR"
+)
+INSTRUCTIONS = (
+    "Choose a swap, directed cycle, or edge flip effect; optionally "
+    "protect other edges, then select Find algorithm."
+)
+
 
 @dataclass
 class EdgeChoice:
@@ -65,13 +75,11 @@ class EdgePickerApp(ttk.Frame):
         self._build_request_panel()
         self._build_actions()
         self._build_results()
-        self._refresh_labels(
-            ("UF", "UR", None, None, "DL", "FL", "BL", "DL", "FR")
-        )
+        self._refresh_labels(DEFAULT_SELECTION)
         self._show_effect_mode()
         self._refresh_preserve_states()
 
-        # Compile once at startup so catalog errors surface before a result can
+        # Compile once at startup so catalogue errors surface before a result can
         # be displayed as trustworthy.
         compiled_catalog()
 
@@ -280,10 +288,7 @@ class EdgePickerApp(ttk.Frame):
             pady=8,
         )
         self.result_text.grid(row=0, column=0, sticky="nsew")
-        self._set_result(
-            "Choose a swap, directed cycle, or edge flip effect; optionally "
-            "protect other edges, then select Find algorithm."
-        )
+        self._set_result(INSTRUCTIONS)
 
     def _labels(self, mode: str | None = None) -> dict[str, str]:
         selected_mode = mode or self.label_mode
@@ -569,13 +574,7 @@ class EdgePickerApp(ttk.Frame):
         self.show_alternatives_var.set(True)
         self._last_request = None
         self._last_results = ()
-        self._refresh_labels(
-            ("UF", "UR", None, None, "DL", "FL", "BL", "DL", "FR")
-        )
+        self._refresh_labels(DEFAULT_SELECTION)
         self._show_effect_mode()
         self._refresh_preserve_states()
-        self._set_result(
-            "Choose a swap, directed cycle, or edge flip effect; optionally "
-            "protect other edges, "
-            "then select Find algorithm."
-        )
+        self._set_result(INSTRUCTIONS)

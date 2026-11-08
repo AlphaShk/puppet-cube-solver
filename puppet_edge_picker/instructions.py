@@ -40,7 +40,7 @@ def grip_faces(rotations: tuple[str, ...] = ()) -> tuple[str, str, str]:
 
 
 def grip_description(rotations: tuple[str, ...] = ()) -> str:
-    """Return a color-name description for a physical cube grip."""
+    """Return a colour-name description for a physical cube grip."""
 
     front, up, right = grip_faces(rotations)
     return ExecutionStep((), front, up, right).grip_name
