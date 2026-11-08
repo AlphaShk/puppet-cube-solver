@@ -1,13 +1,16 @@
-# Puppet Cube Solver
+# Puppet Cube Solver: phase-3 edge algorithms
 
 [![CI](https://github.com/AlphaShk/puppet-cube-solver/actions/workflows/ci.yml/badge.svg)](https://github.com/AlphaShk/puppet-cube-solver/actions/workflows/ci.yml)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-Picks a verified Puppet Cube phase-3 algorithm for a requested edge swap,
-3-cycle or flip. When no published case fits, it builds one from the guide's
-macros with bounded breadth-first and meet-in-the-middle search. Pure
-standard-library Python, with a Tk window and a command-line interface.
+A phase-3 edge-algorithm picker for the Puppet Cube (V1), not a full solver.
+For a requested edge swap, 3-cycle or flip it picks a published algorithm
+whose effect is verified in simulation. When no published case fits, it builds
+one from the guide's macros with bounded breadth-first and meet-in-the-middle
+search. Pure standard-library Python, with a Tk window and a command-line
+interface: the package `puppet_edge_picker` installs the `puppet-edge-picker`
+(window) and `puppet-edge-picker-cli` commands.
 
 ![The window after a search: three edges cycled while the other nine stay in place, with the moves for each grip](docs/screenshot.png)
 
@@ -20,7 +23,7 @@ designed for.
 
 The phase-3 section of a
 [Puppet Cube guide](https://mrlhumphreys.github.io/twisty_guide_j/guides/puppet-cube-phase-3)
-fixes the edges with 36 published algorithms. Using them means knowing which
+solves the edges with 36 published algorithms. Using them means knowing which
 one produces the effect in front of you, how to hold the cube, and what to do
 when none of them fits. This tool answers all three. It simulates every
 published algorithm and matches the requested effect against the verified
@@ -29,42 +32,53 @@ Either way it prints the moves grip by grip.
 
 ## Key results
 
-Counts come from the code and its tests. The coverage table is reproduced by
-`python scripts/coverage.py`, and timings are local measurements.
+Every figure here is printed by `python scripts/coverage.py` (coverage,
+slowest requests, face turns) or `python scripts/search_sizes.py`
+(generators, state counts), and unit tests pin the catalogue counts, the
+generators and the first four search layers. Timings are local measurements
+on an Apple M5 with Python 3.14.
 
-- **36 published algorithms, 34 verified effects.** Every algorithm is
-  simulated from the grip drawn in the guide. Case 7 has the same edge effect
-  as the reverse of Case 8, and the reverse of Case 7 the same as Case 8, so
-  de-duplication by effect leaves 34 catalogue entries. Unit tests assert both
-  counts.
+- **Bounded search with checked answers.** Requests that no published case
+  answers go to a search over the 14 distinct effects of the guide's macros:
+  breadth-first up to four macros (30,419 states), or, for exact flips, a
+  bidirectional search that reaches eight macros while holding at most
+  60,838 states, where a one-way search would need 3,830,186 states by six
+  macros. The slowest request in the families below, an eight-macro exact
+  flip, takes about half a second. Every answer is re-simulated move by move
+  before it is shown, and the code passes `mypy --strict`.
 - **Coverage of complete request families:**
 
-  | Request family | Requests | From catalogue | By macro search | Unanswered | of which name DR/DB/BR |
-  |---|---:|---:|---:|---:|---:|
-  | Flip two edges in place | 66 | 8 | 28 | 30 | 30 |
-  | Swap one pair, nothing protected | 66 | 8 | 28 | 30 | 30 |
-  | Directed 3-cycle, nothing protected | 440 | 10 | 158 | 272 | 272 |
-  | Directed 3-cycle, all other edges protected | 440 | 10 | 72 | 358 | 272 |
-  | Two swaps, all other edges protected | 1485 | 0 | 49 | 1436 | 1107 |
+  | Request family | Requests | From catalogue | By macro search | Unanswered | of which name DR/DB/BR | Answered on the 9 movable edges |
+  |---|---:|---:|---:|---:|---:|---:|
+  | Flip two edges in place | 66 | 8 | 28 | 30 | 30 | 36 of 36 |
+  | Swap one pair, nothing protected | 66 | 8 | 28 | 30 | 30 | 36 of 36 |
+  | Directed 3-cycle, nothing protected | 440 | 10 | 158 | 272 | 272 | 168 of 168 |
+  | Directed 3-cycle, all other edges protected | 440 | 10 | 72 | 358 | 272 | 82 of 168 |
+  | Two swaps, all other edges protected | 1485 | 0 | 49 | 1436 | 1107 | 49 of 378 |
 
   No published case or macro moves the DR, DB or BR edge, so requests that
   name one of them are impossible, not cut off by the search bounds. On the
   other nine edges, every exact two-edge flip, every single swap and every
   unprotected 3-cycle is answered. When every other edge must stay in place,
-  the tool answers 82 of the 168 directed 3-cycles and 49 of the 378 double
-  swaps on those nine edges. The others match no published case and no
+  the remaining 3-cycles and double swaps match no published case and no
   combination of up to four macros.
-- **Search cost.** The slowest request in these families, an eight-macro
-  exact flip, takes about half a second (Apple M5, Python 3.14). Breadth-first
-  search to four macros visits 30,419 states. The bidirectional search
-  reaches eight macros without the 3.8 million states that a one-way search
-  needs by six.
+- **Cost per request family** (slowest request over two runs):
+
+  | Request family | Slowest request | Face turns, catalogue answers | Face turns, search answers |
+  |---|---:|---:|---:|
+  | Flip two edges in place | 0.49 to 0.53 s (8 macros) | 80 to 100 | 40 to 80 |
+  | Swap one pair, nothing protected | 0.02 s | 20 | 20 to 40 |
+  | Directed 3-cycle, nothing protected | 0.08 s | 10 to 50 | 20 to 40 |
+  | Directed 3-cycle, all other edges protected | 0.12 to 0.15 s | 10 to 50 | 30 to 40 |
+  | Two swaps, all other edges protected | 0.09 to 0.13 s | - | 40 |
+
 - **Responsive window.** The search runs on a worker thread that the window
   polls, so the window keeps handling events. Cancel, Reset or closing the
   window stops the search.
-- **89 unit tests** cover the cube model, notation, catalogue, solver,
-  cancellation, worker thread, report, CLI and window. CI runs them on Python
-  3.11, 3.12 and 3.13, plus ruff and `mypy --strict`.
+- **96 unit tests** cover the cube model, notation, catalogue, solver, search
+  space, cancellation, worker thread, report, CLI and window. CI runs them on
+  Python 3.11 to 3.14, with the window tests under a virtual display, plus
+  ruff and `mypy --strict`.
 
 ## How it works
 
@@ -73,7 +87,7 @@ flowchart TB
     subgraph startup["At startup"]
         direction LR
         G["Guide: 36 published<br/>phase-3 algorithms"] --> N["notation.py<br/>parse, invert, count"]
-        N --> C["cube.py<br/>12-edge state, move tables<br/>from Rodrigues rotations"]
+        N --> C["cube.py<br/>12-edge state, move mappings<br/>derived from geometry"]
         C --> A["algorithms.py<br/>drawn grip, simulate,<br/>verify, de-duplicate<br/>(34 entries)"]
     end
     subgraph request["For each request"]
@@ -91,8 +105,8 @@ flowchart TB
    (which piece sits in each slot) plus a 0/1 flip per slot, held in an
    immutable, validated dataclass. Corners are not modelled, because every
    request is about edges.
-2. **Move tables from geometry.** Each face has an outward unit vector `a`. A
-   clockwise quarter turn is a rotation by -90 degrees about `a`, which for
+2. **Move mappings from geometry.** Each face has an outward unit vector `a`.
+   A clockwise quarter turn is a rotation by -90 degrees about `a`, which for
    integer vectors reduces Rodrigues' formula to `v' = -(a × v) + a (a · v)`.
    Applying it to both faces of every edge slot gives the new slot and the new
    sticker orientation, so no move table is typed by hand. A wide turn moves
@@ -106,14 +120,18 @@ flowchart TB
    reverses (derived by inversion), 8 "move 3 edges" compositions, 4 pair
    swaps and 8 two-edge flips. Each one is conjugated into one of the two
    grips the guide draws (`Y X2` or `Z2`), returned to the original colour
-   frame, simulated and compared by effect. Cases are never re-gripped,
-   because the fused blocks make rotated equivalents mechanically invalid.
+   frame, simulated and compared by effect. Case 7 has the same edge effect
+   as the reverse of Case 8, and the reverse of Case 7 the same as Case 8, so
+   de-duplication by effect leaves 34 catalogue entries. Cases are never
+   re-gripped, because the fused blocks make rotated equivalents mechanically
+   invalid.
 5. **Request validation and parity.** Every macro permutes edges in a 5-cycle
    or a 3-cycle, so every reachable state is an even permutation. A request
    with an odd number of swaps therefore needs at least two unprotected edges
-   to absorb a compensating transposition. Otherwise it is rejected before
-   any search, like conflicting or incomplete requests. Requests that would
-   move DR, DB or BR are answered at once.
+   that the macros can move (DR, DB and BR never move) to absorb a
+   compensating transposition. Otherwise it is rejected before any search,
+   like conflicting or incomplete requests. Requests that would move DR, DB
+   or BR are answered at once.
 6. **Bounded search.** If no catalogue entry matches, breadth-first search
    combines the 16 base and reverse macros (14 distinct effects) up to depth
    4, with a 250,000-state cap. It composes effects as permutations with
@@ -145,8 +163,8 @@ cd puppet-cube-solver
 python3 -m venv .venv && source .venv/bin/activate
 python -m pip install .
 
-puppet-edge-picker                                    # open the window
-python -m puppet_edge_picker.cli cycle DL BL FL --preserve-rest
+puppet-edge-picker                                  # open the window
+puppet-edge-picker-cli cycle DL BL FL --preserve-rest
 ```
 
 Installing is optional. From the repository root,
@@ -154,14 +172,16 @@ Installing is optional. From the repository root,
 `python -m puppet_edge_picker.cli ...` runs the CLI.
 There are no runtime dependencies. Tkinter ships with the python.org
 installers; on Debian or Ubuntu install `python3-tk`, and with Homebrew
-install `python-tk@3.x`. The CLI works without Tk.
+install `python-tk@3.x`. The CLI works without Tk. Without tkinter, or
+without a display, the window command prints a hint instead of a traceback
+and exits with status 1.
 
 ## Example
 
 Cycle three edges while every other edge stays in place and unflipped:
 
 ```text
-$ python -m puppet_edge_picker.cli cycle DL BL FL --preserve-rest
+$ puppet-edge-picker-cli cycle DL BL FL --preserve-rest
 Requested edge effect:
   Yellow–Orange → Blue–Orange → Green–Orange → Yellow–Orange
 
@@ -209,31 +229,35 @@ search stopped (state cap or timeout).
 puppet_edge_picker/
   notation.py      move parser (also the guide's R^{2} spelling), inversion, counts
   settings.py      edge slots, colour scheme, labels
-  cube.py          immutable edge state, geometric move tables, 24 orientations
+  cube.py          immutable edge state, move mappings from geometry, 24 orientations
   algorithms.py    transcribed guide cases, grips, compile/verify/de-duplicate
   solver.py        validation, parity, matching, BFS and bidirectional search
   instructions.py  rotations to named grips and execution steps
   report.py        plain-text report shared by the window and the CLI
   worker.py        background search thread with cancellation
   ui.py, main.py   Tk window and its entry point (puppet-edge-picker)
-  cli.py           command-line interface
-scripts/coverage.py  reproduces the coverage table above
-tests/               89 unittest tests
-docs/design.md       conventions, search sizes and design notes
+  cli.py           command-line interface (puppet-edge-picker-cli)
+scripts/coverage.py      reproduces the coverage and cost tables above
+scripts/search_sizes.py  reproduces the generator and state counts
+tests/                   96 unittest tests
+docs/design.md           conventions, search sizes and design notes
 ```
 
 ## Tests and CI
 
 ```bash
-python -m unittest -v                      # 89 tests
-python scripts/coverage.py                 # coverage table, under a minute
+python -m unittest -v                      # 96 tests
+python scripts/coverage.py                 # coverage and cost tables, under a minute
+python scripts/search_sizes.py             # search-space sizes, a few seconds
 python -m pip install -r requirements-dev.txt && ruff check . && mypy
 ```
 
 Six window tests use a real, withdrawn Tk window, for example to check that
 Cancel, Reset and closing the window stop a running search. They skip when
-tkinter is missing, or on Linux when no display is set, as on GitHub Actions.
-A seventh test only imports the window module and skips without tkinter.
+tkinter is missing, or on Linux when no display is set; CI runs the suite
+under `xvfb-run`, so they run there too. A seventh test only imports the
+window module, and two more check the hint the window command prints when
+tkinter is missing or Tk cannot open a window.
 
 ## Limitations
 

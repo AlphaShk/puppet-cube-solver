@@ -39,7 +39,7 @@ own macros are combined.
   slots keep their own piece, and its orientation unless orientation is
   ignored. Slots that are not mentioned are free.
 
-## Move tables from geometry
+## Move mappings from geometry
 
 `cube.py` puts the face centres on the unit axes (R = +x, U = +y, F = +z) and
 treats each edge slot as the pair of faces it touches. A clockwise quarter
@@ -90,7 +90,7 @@ makes rotated copies of an algorithm mechanically invalid.
 `compiled_catalog()` simulates each one, keys it by edge effect and keeps the
 better-ranked definition when two share an effect. In their grips, Case 7 and
 the reverse of Case 8 have the same effect, and so do the reverse of Case 7
-and Case 8, which leaves 34 entries. Every entry is re-simulated before the
+and Case 8, which leaves 34 entries (a test pins both pairs). Every entry is re-simulated before the
 catalogue is returned, and `find_algorithms` re-simulates each match again
 before handing it on instead of trusting the cached effect.
 
@@ -109,8 +109,9 @@ All 14 distinct macro effects are even permutations (twelve 5-cycles and two
 3-cycles), so every state the tool can reach is even. One requested swap is
 odd, so the overall permutation can only be even if another transposition
 happens among the unconstrained slots, which needs at least two of them. A
-single swap with fewer than two free slots is therefore rejected as
-parity-impossible. Two swaps and 3-cycles are even and need no such check.
+single swap with fewer than two free slots that the macros can move is
+therefore rejected as parity-impossible; DR, DB and BR never move, so they do
+not count. Two swaps and 3-cycles are even and need no such check.
 
 No catalogue entry, and so no product of macros, moves or flips DR, DB or BR.
 DB is the anchor every published case keeps in place, and DR and BR turn out
@@ -130,7 +131,8 @@ keeps a global visited set and the macro path to each state, tests every new
 state against the request, and stops after the first depth that produces a
 match, so all returned results use the fewest macros. The limits are depth 4
 and 250,000 states. The number of distinct states reachable with the 14
-generators grows like this:
+generators grows like this (`python scripts/search_sizes.py` prints the table,
+and a unit test pins the first four rows):
 
 | Macros | New states | Reachable in total |
 |---:|---:|---:|
@@ -150,7 +152,7 @@ from solved and one from the target, always expanding the smaller frontier,
 and joins a forward path with the inverted backward path where the two meet.
 Each generator's inverse is found by composing it with every candidate until
 the product is solved, so case names are never trusted. Two balls of radius 4
-hold at most about 61,000 states, compared with over 3.8 million for a
+hold at most 60,838 states (twice 30,419), compared with 3,830,186 for a
 one-way search to depth 6. This makes flips that need 6 to 8 macros
 reachable: UB with FR takes 6 macros, UB with UL takes 8.
 
@@ -195,9 +197,11 @@ cycles to the guide's diagrams, check that every published case starts in
 its drawn grip and returns to the reference frame, and assert the 36
 definitions and 34 de-duplicated entries. They also check parity rejection,
 fallback search results and cancellation of both searches, and that the
-command line runs with tkinter unavailable. The window tests share one Tk
-root and collect garbage on the main thread, so that Tk objects are never
-finalised on a search thread. They skip on Linux when `DISPLAY` is not set.
+command line runs with tkinter unavailable. `SearchSpaceTests` pin the 14
+generators (twelve 5-cycles, two 3-cycles) and the first four breadth-first
+layers. The window tests share one Tk root and collect garbage on the main
+thread, so that Tk objects are never finalised on a search thread. They skip
+on Linux when `DISPLAY` is not set; CI runs them under `xvfb-run`.
 
 ## Possible extensions
 
