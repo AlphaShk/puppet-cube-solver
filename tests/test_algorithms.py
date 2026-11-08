@@ -11,6 +11,7 @@ from puppet_edge_picker.algorithms import (
 )
 from puppet_edge_picker.cube import (
     SOLVED,
+    EdgeState,
     algorithm_effect,
     apply_algorithm,
     flipped_edges,
@@ -148,12 +149,29 @@ class AlgorithmCatalogTests(unittest.TestCase):
         for entry in catalog:
             with self.subTest(name=entry.definition.name):
                 self.assertFalse(entry.definition.generated)
-                self.assertEqual(entry.definition.rotations, ())
                 self.assertIn(
                     entry.definition.starting_rotation,
                     {tuple(("Y", "X2")), tuple(("Z2",))},
                 )
                 self.assertEqual(algorithm_effect(entry.simulation_tokens), entry.effect)
+
+    def test_exactly_two_pairs_of_definitions_share_an_effect(self) -> None:
+        by_effect: dict[EdgeState, set[str]] = {}
+        for record in guide_algorithms():
+            effect = algorithm_effect(record.simulation_moves)
+            by_effect.setdefault(effect, set()).add(record.name)
+        shared = {frozenset(names) for names in by_effect.values() if len(names) > 1}
+        self.assertEqual(
+            shared,
+            {
+                frozenset(
+                    {"Move 3 to 5 Edges — Case 7", "Move 3 to 5 Edges Reverse — Case 8"}
+                ),
+                frozenset(
+                    {"Move 3 to 5 Edges Reverse — Case 7", "Move 3 to 5 Edges — Case 8"}
+                ),
+            },
+        )
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""Constraint validation, catalog matching, and result ranking."""
+"""Constraint validation, catalogue matching, and result ranking."""
 
 from __future__ import annotations
 
@@ -144,13 +144,17 @@ def validate_request(request: Request) -> None:
     # A 3-cycle has even permutation parity; each transposition is odd.  When
     # the explicitly requested permutation is odd, at least two unconstrained
     # slots must remain available to carry the compensating transposition.
+    # Only slots that some macro moves can carry it: DR, DB and BR never move.
     if len(request.swaps) % 2:
-        free_edges = set(EDGES).difference(affected, request.preserved)
+        free_edges = (
+            set(EDGES).difference(affected, request.preserved) & movable_edges()
+        )
         if len(free_edges) < 2:
             raise RequestError(
                 "An odd number of edge-pair swaps while every other edge is "
                 "fixed is parity-impossible. Add a second swap pair or leave "
-                "at least two other edges unprotected."
+                "at least two other edges unprotected (DR, DB and BR never "
+                "move, so they do not count)."
             )
 
 
@@ -344,7 +348,7 @@ def search_exact_flip_combinations(
     generators = _macro_generators()
     inverse_indexes: dict[int, int] = {}
     for index, generator in enumerate(generators):
-        # The verified catalog contains every base macro together with its
+        # The verified catalogue contains every base macro together with its
         # reverse. Applying a generator until it reaches solved identifies the
         # corresponding reverse without relying on case names.
         for candidate_index, candidate in enumerate(generators):
@@ -387,11 +391,13 @@ def search_exact_flip_combinations(
                 state for state in backward_frontier if state in forward_seen
             ]
 
-        if len(forward_seen) + len(backward_seen) >= max_states:
-            raise SearchLimitReached(
-                f"Exact flip search reached its {max_states:,}-state safety limit."
-            )
         if not intersections:
+            # Only a step that found nothing counts against the cap, so a
+            # meeting found in the step that crosses it is still returned.
+            if len(forward_seen) + len(backward_seen) >= max_states:
+                raise SearchLimitReached(
+                    f"Exact flip search reached its {max_states:,}-state safety limit."
+                )
             continue
 
         results: list[CompiledAlgorithm] = []
@@ -419,7 +425,7 @@ def find_algorithms(
     search_macros: bool = True,
     should_cancel: CancelCheck | None = None,
 ) -> tuple[CompiledAlgorithm, ...]:
-    """Return catalog matches, then bounded synthesized matches as fallback.
+    """Return catalogue matches, then bounded synthesized matches as fallback.
 
     The catalogue check takes milliseconds and always completes;
     ``should_cancel`` applies to the fallback search.
@@ -455,9 +461,10 @@ def find_algorithms(
 
 
 def no_match_message(request: Request | None = None) -> str:
+    anchor = f"{edge_label('DB')} (DB)"
     if request is not None and "DB" in requested_edges(request):
         return (
-            "No verified phase-3 case can move or flip the Blue–Yellow (DB) "
+            f"No verified phase-3 case can move or flip the {anchor} "
             "edge in the guide's fixed Puppet Cube grips. That edge is the "
             "anchor preserved by every published case; check the phase setup "
             "or choose a request that leaves it fixed."
@@ -472,7 +479,7 @@ def no_match_message(request: Request | None = None) -> str:
         return (
             f"No verified phase-3 case or macro moves or flips the {names} "
             f"{noun}, so no combination of them can produce this effect. Like "
-            f"the Blue\N{EN DASH}Yellow (DB) anchor, {pronoun} {verb} in place "
+            f"the {anchor} anchor, {pronoun} {verb} in place "
             f"in every published case; choose a request that leaves "
             f"{object_pronoun} fixed."
         )

@@ -4,12 +4,14 @@ import unittest
 from unittest import mock
 
 from puppet_edge_picker.algorithms import catalog_rank, compiled_catalog
-from puppet_edge_picker.cube import algorithm_effect
+from puppet_edge_picker.cube import SOLVED, EdgeState, algorithm_effect, moved_edges
 from puppet_edge_picker.instructions import execution_steps, grip_description
 from puppet_edge_picker.settings import EDGES
 from puppet_edge_picker.solver import (
     Request,
     RequestError,
+    SearchLimitReached,
+    _macro_generators,
     apply_effect,
     find_algorithms,
     matches,
@@ -76,7 +78,8 @@ class SolverTests(unittest.TestCase):
         request = Request(cycles=(("FL", "DB", "BL"),))
         self.assertEqual(find_algorithms(request, search_macros=False), ())
         self.assertIn("anchor", no_match_message(request))
-        self.assertIn("Blue–Yellow", no_match_message(request))
+        # The same name the window, the CLI and edge_label() use for DB.
+        self.assertIn("Yellow\N{EN DASH}Blue (DB)", no_match_message(request))
 
     def test_known_two_pair_swap(self) -> None:
         request = Request(
@@ -92,7 +95,9 @@ class SolverTests(unittest.TestCase):
         request = Request((("UF", "FR"),), frozenset(), True)
         results = find_algorithms(request)
         self.assertTrue(results)
-        self.assertTrue(any(len(set(EDGES) - set(("UF", "FR"))) > 0 for _ in results))
+        self.assertTrue(
+            any(set(moved_edges(result.effect)) - {"UF", "FR"} for result in results)
+        )
 
     def test_catalog_match_keeps_the_exact_guide_grip(self) -> None:
         results = find_algorithms(Request((("UF", "UR"),), frozenset(), True))
@@ -114,7 +119,7 @@ class SolverTests(unittest.TestCase):
             all(result.definition.source_section == "Verified macro search" for result in results)
         )
 
-    def test_white_blue_to_blue_orange_request_has_a_guide_verified_match(self) -> None:
+    def test_white_blue_to_blue_orange_falls_back_to_single_grip_macro_search(self) -> None:
         request = Request((("UB", "BL"),), frozenset(), True)
         results = find_algorithms(request)
         self.assertTrue(results)
@@ -172,6 +177,15 @@ class SolverTests(unittest.TestCase):
             (("UF", "UR"),), frozenset(set(EDGES) - {"UF", "UR", "UB"}), True
         )
         with self.assertRaises(RequestError):
+            validate_request(request)
+
+    def test_fixed_edges_cannot_absorb_the_parity_transposition(self) -> None:
+        # The only unprotected slots are DR, DB and BR, which no macro moves,
+        # so the request is rejected before any search.
+        request = Request(
+            (("UF", "UR"),), frozenset({"UB", "UL", "DF", "DL", "FR", "FL", "BL"})
+        )
+        with self.assertRaisesRegex(RequestError, "parity-impossible"):
             validate_request(request)
 
     def test_conflicting_requests_are_rejected(self) -> None:
@@ -249,6 +263,45 @@ class FixedEdgeTests(unittest.TestCase):
         )
         self.assertEqual(find_algorithms(request), ())
         self.assertIn("search limits", no_match_message(request))
+
+
+class SearchSpaceTests(unittest.TestCase):
+    """Pin the search-space figures quoted in the README and docs/design.md."""
+
+    def test_sixteen_macros_give_fourteen_distinct_even_generators(self) -> None:
+        generators = _macro_generators()
+        self.assertEqual(len(generators), 14)
+        cycle_sizes = sorted(len(moved_edges(g.effect)) for g in generators)
+        self.assertEqual(cycle_sizes, [3] * 2 + [5] * 12)
+        self.assertTrue(all(g.face_turn_count == 10 for g in generators))
+
+    def test_breadth_first_layer_sizes_up_to_four_macros(self) -> None:
+        generators = _macro_generators()
+        seen = {SOLVED}
+        frontier = [SOLVED]
+        layer_sizes: list[int] = []
+        for _depth in range(4):
+            next_frontier: list[EdgeState] = []
+            for state in frontier:
+                for generator in generators:
+                    following = apply_effect(state, generator.effect)
+                    if following not in seen:
+                        seen.add(following)
+                        next_frontier.append(following)
+            layer_sizes.append(len(next_frontier))
+            frontier = next_frontier
+        self.assertEqual(layer_sizes, [14, 180, 2269, 27955])
+        self.assertEqual(len(seen), 30419)
+
+    def test_flip_search_keeps_a_meeting_found_as_it_reaches_the_cap(self) -> None:
+        # With this cap the step that finds the 6-macro UB/FR flip also
+        # reaches the cap, so the answer must still be returned.
+        request = Request(flips=frozenset({"UB", "FR"}))
+        results = search_exact_flip_combinations(request, max_states=4928)
+        self.assertTrue(results)
+        self.assertEqual(results[0].definition.macro_count, 6)
+        with self.assertRaises(SearchLimitReached):
+            search_exact_flip_combinations(request, max_states=500)
 
 
 if __name__ == "__main__":
